@@ -17,39 +17,33 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sk89q.worldguard.protection.flags;
+package com.sk89q.worldguard.protection.flags.registry;
 
-/**
- * Stores an integer.
- */
-public class IntegerFlag extends Flag<Integer> {
+import com.sk89q.worldguard.protection.flags.Flag;
+import com.sk89q.worldguard.protection.flags.FlagContext;
+import com.sk89q.worldguard.protection.flags.InvalidFlagFormat;
 
-    public IntegerFlag(String name, RegionGroup defaultGroup) {
-        super(name, defaultGroup);
-    }
+import javax.annotation.Nullable;
 
-    public IntegerFlag(String name) {
+public class UnknownFlag extends Flag<Object> {
+
+    public UnknownFlag(String name) {
         super(name);
     }
 
     @Override
-    public Integer parseInput(FlagContext context) throws InvalidFlagFormat {
-        return context.getUserInputAsInt();
+    public Object parseInput(FlagContext context) throws InvalidFlagFormat {
+        throw new InvalidFlagFormat("The plugin that registered this flag is not currently installed");
     }
 
     @Override
-    public Integer unmarshal(Object o) {
-        if (o instanceof Integer) {
-            return (Integer) o;
-        } else if (o instanceof Number) {
-            return ((Number) o).intValue();
-        } else {
-            return null;
-        }
-    }
-
-    @Override
-    public Object marshal(Integer o) {
+    public Object unmarshal(@Nullable Object o) {
         return o;
     }
+
+    @Override
+    public Object marshal(Object o) {
+        return o;
+    }
+
 }

@@ -40,6 +40,7 @@ import com.sk89q.worldguard.bukkit.listener.debounce.legacy.BlockEntityEventDebo
 import com.sk89q.worldguard.bukkit.listener.debounce.legacy.EntityEntityEventDebounce;
 import com.sk89q.worldguard.bukkit.listener.debounce.legacy.InventoryMoveItemEventDebounce;
 import com.sk89q.worldguard.bukkit.util.Blocks;
+import com.sk89q.worldguard.bukkit.util.Entities;
 import com.sk89q.worldguard.bukkit.util.Events;
 import com.sk89q.worldguard.bukkit.util.Materials;
 import com.sk89q.worldguard.protection.flags.DefaultFlag;
@@ -283,7 +284,7 @@ public class EventAbstractionListener extends AbstractListener {
                 if (originalSize != blocks.size()) {
                     event.setCancelled(true);
                 }
-                for (Block b : event.getBlocks()) {
+                for (Block b : blocks) {
                     Location loc = b.getRelative(direction).getLocation();
                     Events.fireToCancel(event, new PlaceBlockEvent(event, cause, loc, b.getType()));
                 }
@@ -430,7 +431,6 @@ public class EventAbstractionListener extends AbstractListener {
     @EventHandler(ignoreCancelled = true)
     public void onBlockIgnite(BlockIgniteEvent event) {
         Block block = event.getBlock();
-        Material type = block.getType();
         Cause cause;
 
         // Find the cause
@@ -622,8 +622,20 @@ public class EventAbstractionListener extends AbstractListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerFish(PlayerFishEvent event) {
-        if (Events.fireAndTestCancel(new SpawnEntityEvent(event, create(event.getPlayer(), event.getHook()), event.getHook().getLocation(), EntityType.EXPERIENCE_ORB))) {
-            event.setExpToDrop(0);
+        if (event.getState() == PlayerFishEvent.State.CAUGHT_FISH) {
+            if (Events.fireAndTestCancel(new SpawnEntityEvent(event, create(event.getPlayer(), event.getHook()), event.getHook().getLocation(), EntityType.EXPERIENCE_ORB))) {
+                event.setExpToDrop(0);
+            }
+        } else if (event.getState() == PlayerFishEvent.State.CAUGHT_ENTITY) {
+            Entity caught = event.getCaught();
+            if (caught == null) return;
+            if (caught instanceof Item) {
+                Events.fireToCancel(event, new DestroyEntityEvent(event, create(event.getPlayer(), event.getHook()), caught));
+            } else if (Entities.isConsideredBuildingIfUsed(caught)) {
+                Events.fireToCancel(event, new UseEntityEvent(event, create(event.getPlayer(), event.getHook()), caught));
+            } else if (Entities.isNonHostile(caught) || caught instanceof Player) {
+                Events.fireToCancel(event, new DamageEntityEvent(event, create(event.getPlayer(), event.getHook()), caught));
+            }
         }
     }
 
@@ -877,23 +889,36 @@ public class EventAbstractionListener extends AbstractListener {
             // next to redstone, without plugins getting the clicked place event
             // (not sure if this actually still happens)
             Events.fireToCancel(event, new UseBlockEvent(event, cause, clicked.getLocation(), Material.TNT));
+
+            // Workaround for http://leaky.bukkit.org/issues/1034
+            Events.fireToCancel(event, new PlaceBlockEvent(event, cause, placed.getLocation(), Material.TNT));
+            return;
         }
 
         // Handle created Minecarts
         if (item != null && Materials.isMinecart(item.getType())) {
             // TODO: Give a more specific Minecart type
             Events.fireToCancel(event, new SpawnEntityEvent(event, cause, placed.getLocation().add(0.5, 0, 0.5), EntityType.MINECART));
+            return;
         }
 
         // Handle created boats
         if (item != null && Materials.isBoat(item.getType())) {
             // TODO as above
             Events.fireToCancel(event, new SpawnEntityEvent(event, cause, placed.getLocation().add(0.5, 0, 0.5), EntityType.BOAT));
+            return;
         }
 
         // Handle created armor stands
         if (item != null && item.getType() == Materials.ARMOR_STAND) {
             Events.fireToCancel(event, new SpawnEntityEvent(event, cause, placed.getLocation().add(0.5, 0, 0.5), EntityType.ARMOR_STAND));
+            return;
+        }
+
+        if (item != null && item.getType() == Materials.END_CRYSTAL) { /*&& placed.getType() == Material.BEDROCK) {*/ // in vanilla you can only place them on bedrock but who knows what plugins will add
+                                                                                                                        // may be overprotective as a result, but better than being underprotective
+            Events.fireToCancel(event, new SpawnEntityEvent(event, cause, placed.getLocation().add(0.5, 0, 0.5), EntityType.ENDER_CRYSTAL));
+            return;
         }
 
         // Handle created spawn eggs
@@ -906,6 +931,7 @@ public class EventAbstractionListener extends AbstractListener {
                 }
                 Events.fireToCancel(event, new SpawnEntityEvent(event, cause, placed.getLocation().add(0.5, 0, 0.5), type));
             }
+            return;
         }
 
         // Handle cocoa beans
@@ -914,11 +940,7 @@ public class EventAbstractionListener extends AbstractListener {
             if (!(faceClicked == BlockFace.DOWN || faceClicked == BlockFace.UP)) {
                 Events.fireToCancel(event, new PlaceBlockEvent(event, cause, placed.getLocation(), Material.COCOA));
             }
-        }
-
-        // Workaround for http://leaky.bukkit.org/issues/1034
-        if (item != null && item.getType() == Material.TNT) {
-            Events.fireToCancel(event, new PlaceBlockEvent(event, cause, placed.getLocation(), Material.TNT));
+            return;
         }
     }
 

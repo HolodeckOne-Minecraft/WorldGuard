@@ -17,39 +17,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sk89q.worldguard.protection.flags;
+package com.sk89q.worldguard.protection.flags.registry;
 
-/**
- * Stores an integer.
- */
-public class IntegerFlag extends Flag<Integer> {
+public class FlagConflictException extends RuntimeException {
 
-    public IntegerFlag(String name, RegionGroup defaultGroup) {
-        super(name, defaultGroup);
+    public FlagConflictException(String message) {
+        super(message);
     }
 
-    public IntegerFlag(String name) {
-        super(name);
-    }
-
-    @Override
-    public Integer parseInput(FlagContext context) throws InvalidFlagFormat {
-        return context.getUserInputAsInt();
-    }
-
-    @Override
-    public Integer unmarshal(Object o) {
-        if (o instanceof Integer) {
-            return (Integer) o;
-        } else if (o instanceof Number) {
-            return ((Number) o).intValue();
-        } else {
-            return null;
-        }
-    }
-
-    @Override
-    public Object marshal(Integer o) {
-        return o;
-    }
 }
