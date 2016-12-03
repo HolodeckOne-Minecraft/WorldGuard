@@ -70,8 +70,10 @@ import org.bukkit.event.vehicle.VehicleDestroyEvent;
 import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.material.*;
 import org.bukkit.material.Dispenser;
+import org.bukkit.material.MaterialData;
+import org.bukkit.material.PistonExtensionMaterial;
+import org.bukkit.material.SpawnEgg;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.util.Vector;
 
@@ -106,6 +108,10 @@ public class EventAbstractionListener extends AbstractListener {
         try {
             getPlugin().getServer().getPluginManager().registerEvents(new SpigotCompatListener(), getPlugin());
         } catch (LinkageError ignored) {
+        }
+        try {
+            getPlugin().getServer().getPluginManager().registerEvents(new LingeringPotionListener(), getPlugin());
+        } catch (NoClassDefFoundError ignored) {
         }
     }
 
@@ -711,8 +717,9 @@ public class EventAbstractionListener extends AbstractListener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityCombust(EntityCombustEvent event) {
         if (event instanceof EntityCombustByBlockEvent) {
-            Events.fireToCancel(event, new DamageEntityEvent(event, create(((EntityCombustByBlockEvent) event).getCombuster()), event.getEntity()));
-
+            // at the time of writing, spigot is throwing null for the event's combuster. this causes lots of issues downstream.
+            // whenever (i mean if ever) it is fixed, use getCombuster again instead of the current block
+            Events.fireToCancel(event, new DamageEntityEvent(event, create(event.getEntity().getLocation().getBlock()), event.getEntity()));
         } else if (event instanceof EntityCombustByEntityEvent) {
             Events.fireToCancel(event, new DamageEntityEvent(event, create(((EntityCombustByEntityEvent) event).getCombuster()), event.getEntity()));
         }
@@ -832,6 +839,7 @@ public class EventAbstractionListener extends AbstractListener {
         // Fire entity interaction event
         if (!event.isCancelled()) {
             int blocked = 0;
+            int affectedSize = event.getAffectedEntities().size();
             boolean hasDamageEffect = Materials.hasDamageEffect(potion.getEffects());
 
             for (LivingEntity affected : event.getAffectedEntities()) {
@@ -848,7 +856,7 @@ public class EventAbstractionListener extends AbstractListener {
                 }
             }
 
-            if (blocked == event.getAffectedEntities().size()) {
+            if (blocked == affectedSize) { // server does weird things with this if the event is modified, so use cached number
                 event.setCancelled(true);
             }
         }
@@ -1000,4 +1008,22 @@ public class EventAbstractionListener extends AbstractListener {
         }
     }
 
+    public class LingeringPotionListener implements Listener {
+        @EventHandler(ignoreCancelled = true)
+        public void onLingeringSplash(LingeringPotionSplashEvent event) {
+            AreaEffectCloud aec = event.getAreaEffectCloud();
+            LingeringPotion potion = event.getEntity();
+            World world = potion.getWorld();
+            Cause cause = create(event.getEntity());
+
+            // Fire item interaction event
+            Events.fireToCancel(event, new UseItemEvent(event, cause, world, potion.getItem()));
+
+            // Fire entity spawn event
+            if (!event.isCancelled()) {
+                // radius unfortunately doesn't go through with this, so only a single location is tested
+                Events.fireToCancel(event, new SpawnEntityEvent(event, cause, aec.getLocation().add(0.5, 0, 0.5), EntityType.AREA_EFFECT_CLOUD));
+            }
+        }
+    }
 }
