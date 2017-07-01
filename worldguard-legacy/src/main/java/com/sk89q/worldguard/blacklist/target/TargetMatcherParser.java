@@ -21,7 +21,7 @@ package com.sk89q.worldguard.blacklist.target;
 
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.sk89q.guavabackport.collect.Range;
+import com.google.common.collect.Range;
 import com.sk89q.worldedit.blocks.ItemType;
 import com.sk89q.worldguard.util.Enums;
 import org.bukkit.Material;
@@ -53,14 +53,14 @@ public class TargetMatcherParser {
         try {
             return Integer.parseInt(input);
         } catch (NumberFormatException e) {
-            int id = getItemID(input);
-            if (id > 0) {
-                return id;
-            }
-            
             Material material = Enums.findFuzzyByValue(Material.class, input);
             if (material != null) {
                 return material.getId();
+            }
+
+            int id = getItemID(input);
+            if (id > 0) {
+                return id;
             }
 
             throw new TargetMatcherParseException("Unknown block or item name: " + input);
